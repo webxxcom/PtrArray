@@ -1,0 +1,9 @@
+{
+    "Version": "1.1",
+    "Data": {
+        "Source": "x:\\visual studio 2022\\visualstudio\\vc\\tools\\msvc\\14.41.33923\\modules\\std.ixx",
+        "ProvidedModule": "std",
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}
