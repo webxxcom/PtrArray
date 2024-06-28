@@ -32,3 +32,5 @@
 *.app
 /x64
 /x64
+*.filters
+*.user
