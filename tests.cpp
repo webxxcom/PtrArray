@@ -301,6 +301,9 @@ static void test_stl()
     arr.emplace_back(new Derived1(5));
     arr.emplace_back(new Derived1(4));
 
+    for (auto const& it : arr)
+        std::cout << *it;
+
     // Test std::accumulate
     auto sum = std::accumulate(arr.begin(), arr.end(), 0, [](int acc, Base const* obj) {
         return acc + obj->getValue(); });
