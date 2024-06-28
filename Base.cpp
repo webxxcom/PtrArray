@@ -17,6 +17,13 @@ public:
         return Person(this->name + " " + other.name, this->age + other.age);
     }
 
+    static friend std::ostream& operator<<(std::ostream& is, Person& ps)
+    {
+        std::print(is, "Name: {0}; Age: {1};\n", ps.name, ps.age);
+
+        return is;
+    }
+
     std::strong_ordering operator<=>(Person const& other) const = default;
 };
 
@@ -24,7 +31,7 @@ class Base {
 protected:
     int field;
 public:
-    Base(int a) : field(a) { }
+    explicit Base(int a) : field(a) { }
     Base(Base const& other) = default;
     Base(Base&& other) = default;
     virtual void display() const = 0; // Pure virtual function

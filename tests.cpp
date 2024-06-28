@@ -3,10 +3,15 @@
 
 static void test()
 {
-    // Test default constructor
     PtrArray<Base> arr;
-    assert(arr.empty());
-    assert(arr.empty());
+    arr.emplace_back(new Derived1(1));
+    arr.emplace_back(new Derived1(2));
+    arr.emplace_back(new Derived1(4));
+
+    assert(arr.size() == 3);
+    assert(arr[0]->getValue() == 1);
+    assert(arr[1]->getValue() == 2);
+    assert(arr[2]->getValue() == 4);
 
     // Test initializer list constructor
     PtrArray<Base> arr2;
@@ -17,6 +22,52 @@ static void test()
     assert(arr2[0]->getValue() == 1);
     assert(arr2[1]->getValue() == 2);
     assert(arr2[2]->getValue() == 3);
+
+    // Emplace a new element at the second position
+    auto it = arr.begin();
+    ++it;  // Move iterator to the second position
+    arr.emplace(it, new Derived1(3));
+
+    // Check if the size has increased
+    assert(arr.size() == 4);
+
+    // Check the values to ensure correct positioning
+    assert(arr[0]->getValue() == 1);
+    assert(arr[1]->getValue() == 3);  // New element should be here
+    assert(arr[2]->getValue() == 2);
+    assert(arr[3]->getValue() == 4);
+
+    // Test emplacing at the beginning
+    arr.emplace(arr.begin(), new Derived1(0));
+    assert(arr.size() == 5);
+    assert(arr[0]->getValue() == 0);  // New element at the beginning
+    assert(arr[1]->getValue() == 1);
+    assert(arr[2]->getValue() == 3);
+    assert(arr[3]->getValue() == 2);
+    assert(arr[4]->getValue() == 4);
+
+    // Test emplacing at the end
+    arr.emplace(arr.end(), new Derived1(5));
+    assert(arr.size() == 6);
+    assert(arr[5]->getValue() == 5);  // New element at the end
+
+    // Test emplacing in the middle
+    it = arr.begin() + 3;
+    arr.emplace(it, new Derived1(2));
+    assert(arr.size() == 7);
+    assert(arr[0]->getValue() == 0);
+    assert(arr[1]->getValue() == 1);
+    assert(arr[2]->getValue() == 3);
+    assert(arr[3]->getValue() == 2);  // New element in the middle
+    assert(arr[4]->getValue() == 2);
+    assert(arr[5]->getValue() == 4);
+    assert(arr[6]->getValue() == 5);
+
+    // Test emplacing with an empty array
+    PtrArray<Base> emptyArr;
+    emptyArr.emplace(emptyArr.begin(), new Derived1(10));
+    assert(emptyArr.size() == 1);
+    assert(emptyArr[0]->getValue() == 10);
 
     // Test copy constructor
     PtrArray<Base> arr3 = arr2;
@@ -34,6 +85,7 @@ static void test()
     assert(arr3.size() == 0);
 
     // Test emplace
+    arr.clear();
     arr.emplace(arr.begin(), new Derived1(4));
     assert(arr.size() == 1);
     assert(arr[0]->getValue() == 4);
@@ -134,104 +186,87 @@ static void test_stl()
 
     // Test std::accumulate
     auto sum = std::accumulate(arr.begin(), arr.end(), 0, [](int acc, Base const* obj) {
-        return acc + obj->getValue();
-        });
+        return acc + obj->getValue(); });
     assert(sum == 15);
 
     // Test std::count_if
-    auto count_gt_2 = std::count_if(arr.begin(), arr.end(), [](Base const* obj) {
-        return obj->getValue() > 2;
-        });
+    auto count_gt_2 = std::ranges::count_if(arr, [](Base const* obj) {
+        return obj->getValue() > 2; });
     assert(count_gt_2 == 3);
 
     // Test std::find
-    auto find_it = std::find_if(arr.begin(), arr.end(), [](Base const* obj) {
-        return obj->getValue() == 3;
-        });
+    auto find_it = std::ranges::find_if(arr, [](Base const* obj) {
+        return obj->getValue() == 3; });
     assert(find_it != arr.end());
 
     // Test std::find_if_not
-    auto find_if_not_it = std::find_if_not(arr.begin(), arr.end(), [](Base const* obj) {
-        return obj->getValue() < 3;
-        });
+    auto find_if_not_it = std::ranges::find_if_not(arr.begin(), arr.end(), [](Base const* obj) {
+        return obj->getValue() < 3; });
     assert(find_if_not_it != arr.end());
 
     // Test std::transform
     std::vector<int> transformed(arr.size());
-    std::transform(arr.begin(), arr.end(), transformed.begin(), [](Base const* obj) {
-        return obj->getValue() * 2;
-        });
-
+    std::ranges::transform(arr, transformed.begin(), [](Base const* obj) {
+        return obj->getValue() * 2; });
     assert(transformed[0] == 2 && transformed[1] == 6 && transformed[2] == 4 && transformed[3] == 10 && transformed[4] == 8);
 
     // Test std::generate
     int value = 1;
-    std::generate(arr.begin(), arr.end(), [&value]() -> Base* {
-        if (value % 2 == 0) {
-            return new Derived1(value++);
-        }
-        else {
-            return new Derived2(value++);
-        }
-        });
+    std::ranges::generate(arr, [&value]() -> Base* {
+        if (value % 2 == 0) return new Derived1(value++);        
+        else  return new Derived2(value++); });
     assert(arr[0]->getValue() == 1 && arr[1]->getValue() == 2 && arr[2]->getValue() == 3 && arr[3]->getValue() == 4 && arr[4]->getValue() == 5);
 
     // Test std::shuffle
     std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(arr.begin(), arr.end(), g);
+    std::ranges::shuffle(arr, std::mt19937(rd()));
     // Cannot assert specific order due to shuffling
 
     //Test std::all_of
-    bool all_gt_0 = std::all_of(arr.begin(), arr.end(), [](Base const* obj) {
+    bool all_gt_0 = std::ranges::all_of(arr, [](Base const* obj) {
         return obj->getValue() > 0;
         });
     assert(all_gt_0);
 
     // Test std::any_of
-    bool any_eq_2 = std::any_of(arr.begin(), arr.end(), [](Base const* obj) {
+    bool any_eq_2 = std::ranges::any_of(arr, [](Base const* obj) {
         return obj->getValue() == 2;
         });
     assert(any_eq_2);
 
     // Test std::none_of
-    bool none_eq_0 = std::none_of(arr.begin(), arr.end(), [](Base const* obj) {
+    bool none_eq_0 = std::ranges::none_of(arr, [](Base const* obj) {
         return obj->getValue() == 0;
         });
     assert(none_eq_0);
 
     // Test std::replace_if
-    auto it = std::find_if(arr.begin(), arr.end(), [](Base* obj) {return obj->getValue() == 5; });
-    std::replace_if(arr.begin(), arr.end(), [](Base* obj) {
+    auto it = std::ranges::find_if(arr, [](Base const* obj) {return obj->getValue() == 5; });
+    std::ranges::replace_if(arr, [](Base const* obj) {
         return obj->getValue() == 5;
         }, new Derived1(6));
 
     assert(it->getValue() == 6);
 
-    //// Test std::sort
-    //std::sort(arr.begin(), arr.end(), [](Base* a, Base* b) {
-    //    return a->getValue() < b->getValue();
-    //    });
-    //assert(arr[0].getValue() == 1);
-    //assert(arr[1].getValue() == 2);
-    //assert(arr[2].getValue() == 3);
-    //assert(arr[3].getValue() == 4);
-    //assert(arr[4].getValue() == 6);
+    // Test std::sort
+    std::ranges::sort(arr);
+    assert(arr[0]->getValue() == 1);
+    assert(arr[1]->getValue() == 2);
+    assert(arr[2]->getValue() == 3);
+    assert(arr[3]->getValue() == 4);
+    assert(arr[4]->getValue() == 6);
 
     // Test std::max_element
-    auto max_it = std::max_element(arr.begin(), arr.end(), [](Base const* a, Base const* b) {
-        return a->getValue() < b->getValue();
-        });
-    assert(max_it != arr.end() && max_it->getValue() == 6);
-
-    // Test std::min_element
-    auto min_it = std::min_element(arr.begin(), arr.end(), [](Base const* a, Base const* b) {
-        return a->getValue() < b->getValue();
-        });
-    assert(min_it != arr.end() && min_it->getValue() == 1);
+    auto [min_it, max_it] = std::ranges::minmax(arr);
+    assert(min_it->getValue() == 1 && max_it->getValue() == 6);
 
     // Test std::reverse
-    std::reverse(arr.begin(), arr.end());
+    std::ranges::reverse(arr);
+    assert(arr[0]->getValue() == 6);
+    assert(arr[1]->getValue() == 4);
+    assert(arr[2]->getValue() == 3);
+    assert(arr[3]->getValue() == 2);
+    assert(arr[4]->getValue() == 1);
 
     std::cout << "All tests passed!" << std::endl;
 }
@@ -258,7 +293,7 @@ static void test_move_constructor() {
     assert(moved_arr.size() == 2);
     assert(moved_arr[0]->getValue() == 3);
     assert(moved_arr[1]->getValue() == 1);
-    assert(arr.size() == 0);  // Original array should be empty
+    assert(arr.empty());  // Original array should be empty
 }
 
 static void test_copy_assignment_operator() {
@@ -285,7 +320,7 @@ static void test_move_assignment_operator() {
     assert(moved_arr.size() == 2);
     assert(moved_arr[0]->getValue() == 3);
     assert(moved_arr[1]->getValue() == 1);
-    assert(arr.size() == 0);  // Original array should be empty
+    assert(arr.empty());  // Original array should be empty
 }
 
 static void test_std_sort() {
@@ -294,7 +329,7 @@ static void test_std_sort() {
     arr.emplace_back(new Derived2(1));
     arr.emplace_back(new Derived1(2));
 
-    std::sort(arr.begin(), arr.end(), [](Base const* a, Base const* b) {
+    std::ranges::sort(arr, [](Base const* a, Base const* b) {
         return a->getValue() < b->getValue();
         });
 
@@ -309,9 +344,8 @@ static void test_std_min_element() {
     arr.emplace_back(new Derived2(1));
     arr.emplace_back(new Derived1(2));
 
-    auto min_it = std::min_element(arr.begin(), arr.end(), [](Base const* a, Base const* b) {
-        return a->getValue() < b->getValue();
-        });
+    auto min_it = std::ranges::min_element(arr, [](Base const* a, Base const* b) {
+        return a->getValue() < b->getValue(); });
 
     assert(min_it != arr.end());
     assert(min_it->getValue() == 1);
@@ -340,7 +374,4 @@ static void test_erase() {
     assert(arr.size() == 2);
     assert(arr[0]->getValue() == 3);
     assert(arr[1]->getValue() == 2);
-
-    for (auto& it : arr)
-        std::cout << *it;
 }

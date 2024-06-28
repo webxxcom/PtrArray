@@ -1,134 +1,60 @@
 #pragma once
 #include "stdafx.h"
 
-template<typename TypeToClone>
-concept Cloneable = requires(TypeToClone obj) { obj.clone(); };
+using std::swap;
 
-template <Cloneable T>
+template<typename TypeToClone>
+concept cloneable = requires(TypeToClone obj)
+{
+    obj.clone();
+};
+
+//Non-movable array that stores pointers
+template <cloneable T>
 class PtrArray
 {
 public:
-    class Wrapper;
     class Iterator;
+    class Wrapper;
 
+    //Aliases for std library algorithms
     using value_type = Wrapper;
+    using pointer = value_type*;
     using reference = value_type&;
+
 private:
-    size_t _length;
-    size_t _capacity;
-    Wrapper* _array;
-        
-    class Wrapper
-    {
-    private:
-        using value_type = T*;
-        using reference = value_type&;
-        using pointer = value_type*; 
-        
-        pointer _wrapped;//Pointer at objects pointer
-    public:
-        Wrapper() noexcept
-            : _wrapped(new value_type{ nullptr }) { }
-
-        explicit Wrapper(const value_type m_ptr) noexcept
-            : _wrapped(&m_ptr) { }
-
-        explicit Wrapper(value_type&& m_ptr) noexcept
-        {
-            this->operator=(std::forward<value_type>(m_ptr));
-        }
-
-        reference operator=(const value_type other)
-        {
-            if (*this->_wrapped)
-                delete* this->_wrapped;
-
-            this->_wrapped = other->clone();
-        }
-
-        //Move m_ptr to wrapped
-        reference operator=(value_type&& m_ptr)
-        {
-            if (this->_wrapped)
-            {
-                if (*this->_wrapped)
-                    delete* this->_wrapped;
-
-                *this->_wrapped = m_ptr;
-                m_ptr = nullptr;
-            }
-
-            return *this;
-        }
-
-        explicit(false) operator T* ()
-        {
-            return *this->_wrapped;
-        }
-    };
-
-    class Iterator
-    {
-    private:
-        T* m_ptr;
-
-    public:
-        using iterator_category = std::random_access_iterator_tag;
-        using difference_type = std::ptrdiff_t;
-        using value_type = Wrapper&;
-        using pointer = T*;
-        using reference = pointer&;
-
-        explicit Iterator(pointer m_ptr) noexcept : m_ptr(m_ptr) { };
-
-        Iterator(Iterator const& other) noexcept : m_ptr(other.m_ptr) { }
-
-        value_type operator*() const { return m_ptr; }
-
-        pointer operator->() const { return m_ptr; }
-
-        Iterator& operator++() { ++m_ptr;  return *this; }
-
-        Iterator operator++(int) { auto temp = *this; ++m_ptr;  return temp; }
-
-        Iterator& operator--() { --m_ptr;  return *this; }
-
-        Iterator operator--(int) { auto temp = *this; --m_ptr;  return temp; }
-
-        Iterator operator+(difference_type n) const { return Iterator(m_ptr + n); }
-
-        Iterator operator-(difference_type n) const { return Iterator(m_ptr - n); }
-
-        Iterator& operator=(Iterator const& other) { this->m_ptr = other.m_ptr; return *this; }
-
-        difference_type operator-(Iterator const& rhs) const { return m_ptr - rhs.m_ptr; }
-
-        std::strong_ordering operator<=>(Iterator const& rhs) const = default;
-    };
-
     //Fields
+    const size_t _init_capacity = 10;
     size_t _length = 0;
-    size_t _capacity = _init_capacity;
-    Wrapper* _array = nullptr;
+    size_t _capacity = 0;
+    pointer _array = nullptr;
 
     //Private methods
-    void _change_Array(Wrapper* array, size_t length, size_t capacity)
+    
+    //Change length, capacity, array and if _Arr is nullptr allocate new memory
+    void _change_Array(pointer _Arr, size_t _Len, size_t _Cap)
     {
-        this->_array = array;
-        this->_capacity = capacity;
-        this->_length = length;
+        if (!_Arr) this->_allocate(_Cap);
+        else this->_array = _Arr, this->_capacity = _Cap;
+
+        this->_length = _Len;
     }
 
+    //Allocate array of nullptrs if _new_Capacity > 0 otherwise _array = nullptr, set new capacity
+    void _allocate(size_t _new_Capacity)
+    {
+        this->_array = _new_Capacity > 0 ?
+            new value_type[_new_Capacity]
+            : nullptr;
+
+        this->_capacity = _new_Capacity;
+    }
+    
     //Delete all the pointers and set _array to nullptr
     void _deallocate()
     {
-        //Clear all the data pointers point at
-        for (size_t i = 0; i < this->_length; ++i)
-            delete this->_array[i];
+        //Clear all the data pointer points at
         delete[] this->_array;
-
-        //Set pointer to nullptr to avoid unexpected behaviour
-        this->_array = nullptr;
     }
 
     //Check whether _array is full of elements
@@ -137,44 +63,188 @@ private:
         return this->_length >= this->_capacity;
     }
 
-    //Allocate array of nullptrs if _new_Capacity > 0 otherwise _array = nullptr, set new capacity
-    void _allocate(size_t _new_Capacity)
-    {
-        this->_array = _new_Capacity > 0 ?
-            new Wrapper[_new_Capacity]
-            : nullptr;
-
-        this->_capacity = _new_Capacity;
-    }
-
     //Double capacity -> move to new array -> assign
     void _expandAndMove()
     {
         size_t newCapacity = (this->_capacity + 1) << 1;
 
-        auto newArray = new Wrapper[newCapacity];
-        std::move(this->begin(), this->end(), newArray);
+        auto newArray = new value_type[newCapacity];
+        std::ranges::move(*this, newArray);
 
-        delete[] _array;
-        this->_array = newArray;
-        this->_capacity = newCapacity;
+        this->_deallocate();
+        this->_change_Array(newArray, this->_length, newCapacity);
     }
 
     template<typename U>
-    void _emplaceChecked(U&& obj, Iterator iter)
+    void _Emplace_At(U&& obj, Iterator iter)
     {
         *iter = obj;
-
         ++this->_length;
     }
 
-    const size_t _init_capacity = 10;
 public:
+    //Define wrapper for T pointer to handle the assignment operator for dereferenced iterators properly
+    //Wrapper allows for an array to be working with STL library algorithms
+    struct Wrapper
+    {
+    private:
+        //Aliases
+        using value_type = T;
+        using pointer = value_type*;
+        using reference = value_type&;
+
+        //Pointer at data
+        pointer _data = nullptr;
+
+    public:
+        //Constructors
+        explicit Wrapper() noexcept = default;
+
+        explicit Wrapper(pointer const& _ptr) noexcept
+            //To copy data we need to clone it if there is something in 'ptr'
+            : _data(_ptr ? _ptr->clone() : nullptr)
+        { }
+
+        explicit Wrapper(pointer&& _ptr) noexcept
+            : _data(std::move(_ptr))
+        { _ptr = nullptr; }
+
+        Wrapper(Wrapper const& other) noexcept
+            : _data(other._data ? other._data->clone() : nullptr)
+        { }
+
+        Wrapper(Wrapper&& other) noexcept
+            : _data(std::move(other._data))
+        { other._data = nullptr; }
+
+        ~Wrapper()
+        {
+            delete this->_data;
+        }
+
+        //Allow implicit conversion to T*
+        explicit(false) operator pointer() const { return this->_data; }
+
+        //Copy and move assignment operators for other object of 'Wrapper' type
+        Wrapper& operator=(Wrapper const& other) noexcept
+        {
+            delete this->_data;
+
+            this->_data = other._data ? other._data->clone() : nullptr;
+            return *this;
+        }
+
+        Wrapper& operator=(Wrapper&& other) noexcept
+        {
+            if (this->_data != other._data)
+            {
+                delete this->_data;
+
+                this->_data = other._data;
+                other._data = nullptr;
+            }
+
+            return *this;
+        }
+
+        //Copy assignment operators for T* type
+        Wrapper& operator=(pointer const& ptr) noexcept
+        {
+            if (this->_data != ptr)
+            {
+                delete this->_data;
+                this->_data = ptr ? ptr->clone() : nullptr;
+            }
+
+            return *this;
+        }
+
+        //Move assignment operator for pointer to avoid memory leak when assigning rvalue reference
+        Wrapper& operator=(pointer&& ptr) noexcept
+        {
+            delete this->_data;
+            this->_data = std::move(ptr);
+
+            ptr = nullptr;
+            return *this;
+        }
+
+        //Overload '->' to get access to data without converting
+        pointer operator->() const
+        {
+            return this->_data;
+        }
+
+        //Implement spaceship operator to compare 'Wrapper's without converting to 'T*'
+        std::strong_ordering operator<=>(Wrapper const& other) const noexcept
+        {
+            if (!_data && !other._data)
+                return std::strong_ordering::equivalent;
+
+            if (!_data)
+                return std::strong_ordering::less;
+
+            if (!other._data)
+                return std::strong_ordering::greater;
+
+            if (*_data < *other._data)
+                return std::strong_ordering::less;
+
+            if (*_data > *other._data)
+                return std::strong_ordering::greater;
+
+            return std::strong_ordering::equivalent;
+        }
+};
+
+    //Random-access iterator
+    class Iterator
+    {
+    private:
+        Wrapper* m_ptr;
+
+    public:
+        //Aliases for std library algorithms
+        using iterator_category = std::random_access_iterator_tag;
+        using difference_type = std::ptrdiff_t;
+        using value_type = Wrapper;
+        using pointer = value_type*;
+        using reference = value_type&;
+
+        //Constructors
+        Iterator() : m_ptr(nullptr) { }
+
+        explicit Iterator(Wrapper* m_ptr) : m_ptr(m_ptr) { };
+
+        //Accesssors
+        reference operator*() const { return *m_ptr; }
+        T* operator->() { return *m_ptr; }
+
+        reference operator[] (const int& ind) const { return this->m_ptr[ind]; }
+
+        //Arithmetic
+        Iterator& operator++() { ++m_ptr;  return *this; }
+        Iterator& operator--() { --m_ptr;  return *this; }
+
+        Iterator operator++(int) { auto temp = *this; ++m_ptr;  return temp; }
+        Iterator operator--(int) { auto temp = *this; --m_ptr;  return temp; }
+
+        Iterator operator+(difference_type n) const { return Iterator(m_ptr + n); }
+        Iterator operator-(difference_type n) const { return Iterator(m_ptr - n); }
+ 
+        Iterator& operator+=(difference_type n) { m_ptr += n; return *this; }
+        Iterator& operator-=(difference_type n) { m_ptr -= n; return *this; }
+
+        static friend Iterator operator+(difference_type n, Iterator other) { return Iterator(m_ptr + n); }
+        difference_type operator-(Iterator const& rhs) const { return m_ptr - rhs.m_ptr; }
+       
+        //Comparison
+        std::strong_ordering operator<=>(Iterator const& rhs) const = default;
+    };
+
     //Constructors
     PtrArray()
-    {
-        this->_allocate(this->_capacity);
-    }
+    { this->_allocate(this->_capacity); }
 
     PtrArray(PtrArray<T> const& other)
     {
@@ -230,9 +300,10 @@ public:
         }
 
         // Move elements to make space for the new element
-        std::move_backward(position, this->end(), position + 2);
+        std::move_backward(position, this->end(), this->end() + 1);
 
-        this->_emplaceChecked(std::forward<U>(obj), position);
+        //Emplace object at a now-freed position
+        this->_Emplace_At(std::forward<U>(obj), position);
     }
 
     template<typename U>
@@ -247,15 +318,17 @@ public:
         this->emplace(this->end(), std::forward<U>(obj));
     }
 
-    //Erase elements at [first, last)
+    //Erase elements at [_First, _Last)
     void erase(Iterator _First, Iterator _Last)
     {
         if (this->empty() || _First < this->begin() || _Last > this->end() || _First >= _Last)
             return;
 
-        auto _dist = std::distance(_First, _Last);
-
+        //Shift data after _Last to the left 
         std::move(_Last, this->end(), _First);
+
+        //nullptr the now-dangled pointers
+        auto _dist = std::distance(_First, _Last);
         for (decltype(_dist) i = 0; i < _dist; ++i)
             *(this->end() - i - 1) = nullptr;
 
@@ -276,15 +349,15 @@ public:
     void clear()
     {
         this->_deallocate();
-        this->_length = 0;
-        this->_capacity = _init_capacity;
+
+        this->_change_Array(nullptr, 0, this->_init_capacity);
     }
 
     bool empty() const noexcept
     {
         return !this->_length;
     }
-
+    
     T const& at(const size_t index) const noexcept(false)
     {
         if (index >= this->_length)
@@ -311,4 +384,3 @@ public:
         return Iterator(this->_array + this->_length);
     }
 };
-

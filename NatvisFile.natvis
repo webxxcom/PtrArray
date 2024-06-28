@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="PtrArray&lt;*&gt;">
+		<DisplayString>Length = {_length}, Capacity = {_capacity}</DisplayString>
+		<Expand>
+			<Item Name="Length">_length</Item>
+			<Item Name="Capacity">_capacity</Item>
+			<ArrayItems>
+				<Size>_capacity</Size>
+				<ValuePointer>_array</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+</AutoVisualizer>
