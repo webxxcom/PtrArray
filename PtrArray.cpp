@@ -1,13 +1,9 @@
 #pragma once
 #include "stdafx.h"
 
-using std::swap;
-
 template<typename TypeToClone>
 concept cloneable = requires(TypeToClone obj)
-{
-    obj.clone();
-};
+{ obj.clone(); };
 
 //Non-movable array that stores pointers
 template <cloneable T>
@@ -75,11 +71,22 @@ private:
         this->_change_Array(newArray, this->_length, newCapacity);
     }
 
-    template<typename U>
-    void _Emplace_At(U&& obj, Iterator iter)
+    void _expandAndMove(size_t _Total_Capacity)
     {
-        *iter = obj;
-        ++this->_length;
+        size_t newCapacity = (_Total_Capacity + 1) << 1;
+
+        auto newArray = new value_type[newCapacity];
+        std::ranges::move(*this, newArray);
+
+        this->_deallocate();
+        this->_change_Array(newArray, this->_length, newCapacity);
+    }
+
+    template<typename... Args>
+    void _Emplace_elements(Iterator it, Args&&... elems)
+    {
+        ((*(it++) = std::forward<Args>(elems)), ...);
+        this->_length += sizeof...(elems);
     }
 
 public:
@@ -256,6 +263,15 @@ public:
         this->operator=(std::move(other));
     }
 
+    template<typename... Args>
+    explicit PtrArray(Args&&... elems) noexcept
+    {
+        size_t size = sizeof...(elems);
+        this->_allocate(size);
+
+        this->_Emplace_elements(this->begin(), std::forward<Args>(elems)...);
+    }
+
     //Copy and assignment operators
     PtrArray<T>& operator=(PtrArray<T> const& other)
     {
@@ -289,27 +305,28 @@ public:
     }
 
     //Modifiers
-    template <typename U>
-    void emplace(Iterator position, U&& obj)
+    template <typename... Args>
+    void emplace(Iterator position, Args&&... elems)
     {
         size_t index = position - this->begin();
-        if (this->_isFull())
+        size_t size = sizeof...(elems);
+        if (this->_length + size > this->_capacity)
         {
-            this->_expandAndMove();
+            this->_expandAndMove(this->_length + size);
             position = this->begin() + index;
         }
 
         // Move elements to make space for the new element
-        std::move_backward(position, this->end(), this->end() + 1);
+        std::move_backward(position, this->end(), this->end() + size);
 
         //Emplace object at a now-freed position
-        this->_Emplace_At(std::forward<U>(obj), position);
+        this->_Emplace_elements(position, std::forward<Args>(elems)...);
     }
 
-    template<typename U>
-    void emplace_back(U&& obj)
+    template <typename... Args>
+    void emplace_back(Args&&... elems)
     {
-        this->emplace(this->end(), std::forward<U>(obj));
+        this->emplace(this->end(), std::forward<Args>(elems)...);
     }
 
     template<typename U>

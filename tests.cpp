@@ -23,6 +23,123 @@ static void test()
     assert(arr2[1]->getValue() == 2);
     assert(arr2[2]->getValue() == 3);
 
+    {
+        PtrArray<Base> arr;
+        arr.emplace(arr.begin(), new Derived1(1), new Derived1(2));
+        assert(arr.size() == 2);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+
+        arr.emplace(arr.end(), new Derived1(3), new Derived1(4));
+        assert(arr.size() == 4);
+        assert(arr[2]->getValue() == 3);
+        assert(arr[3]->getValue() == 4);
+    }
+    {
+        PtrArray<Base> arr(new Derived1(1), new Derived1(2), new Derived1(3));
+        assert(arr.size() == 3);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+        assert(arr[2]->getValue() == 3);
+    }
+    {
+        PtrArray<Base> arr(new Derived1(2), new Derived1(3));
+        arr.emplace(arr.begin(), new Derived1(1));
+        assert(arr.size() == 3);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+        assert(arr[2]->getValue() == 3);
+    }
+    {
+        PtrArray<Base> arr(new Derived1(1), new Derived1(3));
+        auto it = arr.begin();
+        std::advance(it, 1); // Move iterator to position 1
+        arr.emplace(it, new Derived1(2));
+        assert(arr.size() == 3);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+        assert(arr[2]->getValue() == 3);
+    }
+    {
+        PtrArray<Base> arr(new Derived1(1), new Derived1(2));
+        arr.emplace(arr.end(), new Derived1(3));
+        assert(arr.size() == 3);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+        assert(arr[2]->getValue() == 3);
+    }
+   {
+        PtrArray<Base> arr(new Derived1(1), new Derived1(4));
+        auto it = arr.begin();
+        std::advance(it, 1); // Move iterator to position 1
+        arr.emplace(it, new Derived1(2), new Derived1(3));
+        assert(arr.size() == 4);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+        assert(arr[2]->getValue() == 3);
+        assert(arr[3]->getValue() == 4);
+    }
+    {
+        PtrArray<Base> arr(new Derived1(1));
+        arr.emplace(arr.end(), new Derived2(2)); // Assuming Derived2 is another subclass of Base
+        assert(arr.size() == 2);
+        assert(arr[0]->getValue() == 1);
+        assert(dynamic_cast<Derived1*>(arr[0]) != nullptr);
+        assert(arr[1]->getValue() == 2);
+        assert(dynamic_cast<Derived2*>(arr[1]) != nullptr);
+    }
+
+    {
+        PtrArray<Base> arr;
+        arr.emplace_back(new Derived1(2));
+        arr.emplace_back(new Derived1(3));
+
+        arr.emplace(arr.begin(), new Derived1(1));
+        assert(arr.size() == 3);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+        assert(arr[2]->getValue() == 3);
+    }
+
+    {
+        PtrArray<Base> arr;
+        arr.emplace_back(new Derived1(1));
+        arr.emplace_back(new Derived1(3));
+
+        auto it = arr.begin();
+        std::advance(it, 1); // Move iterator to position 1
+        arr.emplace(it, new Derived1(2));
+        assert(arr.size() == 3);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+        assert(arr[2]->getValue() == 3);
+    }
+
+    {
+        PtrArray<Base> arr;
+        arr.emplace_back(new Derived1(1));
+        arr.emplace_back(new Derived1(2));
+
+        arr.emplace(arr.end(), new Derived1(3));
+        assert(arr.size() == 3);
+        assert(arr[0]->getValue() == 1);
+        assert(arr[1]->getValue() == 2);
+        assert(arr[2]->getValue() == 3);
+    }
+
+    {
+        PtrArray<Base> arr;
+        arr.emplace(arr.begin(), new Derived1(1));
+        arr.emplace(arr.end(), new Derived2(2)); // Assuming Derived2 is another subclass of Base
+
+        assert(arr.size() == 2);
+        assert(arr[0]->getValue() == 1);
+        assert(dynamic_cast<Derived1*>(arr[0]) != nullptr);
+        assert(arr[1]->getValue() == 2);
+        assert(dynamic_cast<Derived2*>(arr[1]) != nullptr);
+    }
+
+
     // Emplace a new element at the second position
     auto it = arr.begin();
     ++it;  // Move iterator to the second position
